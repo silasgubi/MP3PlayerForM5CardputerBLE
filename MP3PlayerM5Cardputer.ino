@@ -22,6 +22,7 @@
 #include <AudioGeneratorAAC.h>
 #include <AudioGeneratorWAV.h>
 #include <AudioFileSourceBuffer.h>
+#include "equalizer.h"
 // ==========================================
 // CONSTANTS & CONFIG
 // ==========================================
@@ -72,7 +73,7 @@ void applyTheme(int index) {
 }
 
 enum LoopState { NO_LOOP, LOOP_ALL, LOOP_ONE };
-enum UIState { UI_PLAYER, UI_SETTINGS, UI_HELP, UI_WIFI_SCAN, UI_TEXT_INPUT, UI_FOLDER_SELECT, UI_SEARCH };
+enum UIState { UI_PLAYER, UI_SETTINGS, UI_HELP, UI_WIFI_SCAN, UI_TEXT_INPUT, UI_FOLDER_SELECT, UI_SEARCH, UI_EQ };
 
 const uint32_t sampleRateValues[] = { 44100, 48000, 88200, 96000, 128000 };
 const char* sampleRateLabels[] = { "44.1k", "48k", "88.2k", "96k", "128k" };
@@ -137,6 +138,8 @@ struct Settings {
     String currentFolder = "";    // "" = All Music; "/FolderName" = specific folder
     String languageCode = "en";   // i18n language code, e.g. "en", "ja"
     int uiFontSizeIndex = 0;      // 0=Small(12), 1=Medium(16)
+    int8_t eqGain[EQ_BANDS] = {0};
+    bool eqEnabled = true;
 };
 
 Settings userSettings;
@@ -205,7 +208,9 @@ class AudioOutputM5Speaker : public AudioOutput {
     AudioOutputM5Speaker(m5::Speaker_Class* m5sound, uint8_t virtual_sound_channel = 0) { _m5sound = m5sound; _virtual_ch = virtual_sound_channel; }
     virtual ~AudioOutputM5Speaker(void) {};
     virtual bool begin(void) override { return true; }
+    virtual bool SetRate(int hz) override { hertz = hz; globalEQ.update((float)hz); return true; }
     virtual bool ConsumeSample(int16_t sample[2]) override {
+      globalEQ.process(sample);
       if (_tri_buffer_index < tri_buf_size) {
         _tri_buffer[_tri_index][_tri_buffer_index] = sample[0]; _tri_buffer[_tri_index][_tri_buffer_index+1] = sample[1]; _tri_buffer_index += 2; return true;
       }
@@ -253,6 +258,11 @@ public:
         userSettings.currentFolder = preferences.getString("curFolder", "");
         userSettings.languageCode = preferences.getString("langCode", "en");
         userSettings.uiFontSizeIndex = preferences.getInt("uiFont", 0);
+        userSettings.eqEnabled = preferences.getBool("eqEnabled", true);
+        for (int i = 0; i < EQ_BANDS; i++) {
+            String key = "eq" + String(i);
+            userSettings.eqGain[i] = (int8_t)preferences.getInt(key.c_str(), 0);
+        }
         preferences.end();
         
         if(userSettings.apSSID.length() == 0) userSettings.apSSID = "Cardputer";
@@ -282,6 +292,11 @@ public:
         preferences.putString("curFolder", userSettings.currentFolder);
         preferences.putString("langCode", userSettings.languageCode);
         preferences.putInt("uiFont", userSettings.uiFontSizeIndex);
+        preferences.putBool("eqEnabled", userSettings.eqEnabled);
+        for (int i = 0; i < EQ_BANDS; i++) {
+            String key = "eq" + String(i);
+            preferences.putInt(key.c_str(), (int)userSettings.eqGain[i]);
+        }
         preferences.end();
     }
 
@@ -683,6 +698,9 @@ public:
     static std::vector<String> folderList;
     static int folderCursor;
     static int folderScrollOffset;
+
+    // EQ state
+    static int eqCursor;
 
     // -----------------------------------------------
     // SEARCH UI
@@ -1455,6 +1473,67 @@ public:
         drawHeader(); drawPlaylist(); drawNowPlaying(); drawBottomBar();
         if(!showVisualizer) { visSprite.fillScreen(C_BG_DARK); visSprite.pushSprite(PLAYLIST_WIDTH + 2, HEADER_HEIGHT + 55); }
     }
+
+    static void drawEQ() {
+        M5Cardputer.Display.fillScreen(C_BG_DARK);
+        // Header
+        M5Cardputer.Display.fillRect(0, 0, M5Cardputer.Display.width(), HEADER_HEIGHT, C_HEADER);
+        M5Cardputer.Display.setFont(&fonts::Font0);
+        M5Cardputer.Display.setTextColor(C_TEXT_MAIN, C_HEADER);
+        M5Cardputer.Display.setCursor(5, 5);
+        M5Cardputer.Display.print("EQUALIZER");
+        M5Cardputer.Display.setCursor(M5Cardputer.Display.width() - 55, 5);
+        M5Cardputer.Display.setTextColor(userSettings.eqEnabled ? C_PLAYING : C_TEXT_DIM, C_HEADER);
+        M5Cardputer.Display.print(userSettings.eqEnabled ? "[ON] " : "[OFF]");
+
+        int rowH = 13;
+        int startY = HEADER_HEIGHT + 3;
+        int barX = 68, barW = 130, barMid = barX + barW / 2;
+
+        for (int i = 0; i < EQ_BANDS; i++) {
+            int y = startY + i * rowH;
+            bool sel = (i == eqCursor);
+
+            if (sel) {
+                M5Cardputer.Display.fillRect(0, y, M5Cardputer.Display.width(), rowH, C_BG_LIGHT);
+                M5Cardputer.Display.setTextColor(C_HIGHLIGHT);
+            } else {
+                M5Cardputer.Display.setTextColor(C_TEXT_DIM);
+            }
+
+            // Band label
+            M5Cardputer.Display.setCursor(2, y + 2);
+            M5Cardputer.Display.print(EQ_LABELS[i]);
+
+            // Bar background
+            int8_t g = userSettings.eqGain[i];
+            M5Cardputer.Display.fillRect(barX, y + 3, barW, rowH - 6, C_BG_DARK);
+            M5Cardputer.Display.drawRect(barX, y + 3, barW, rowH - 6, sel ? C_ACCENT : C_TEXT_DIM);
+            M5Cardputer.Display.drawFastVLine(barMid, y + 3, rowH - 6, sel ? C_ACCENT : C_TEXT_DIM);
+
+            // Fill: center to gain position
+            int fillPx = (int)(g * (barW / 2) / 12);
+            uint16_t fillColor = g > 0 ? C_PLAYING : (g < 0 ? C_HIGHLIGHT : C_TEXT_DIM);
+            if (fillPx > 0)
+                M5Cardputer.Display.fillRect(barMid, y + 4, fillPx, rowH - 8, fillColor);
+            else if (fillPx < 0)
+                M5Cardputer.Display.fillRect(barMid + fillPx, y + 4, -fillPx, rowH - 8, fillColor);
+
+            // dB value
+            M5Cardputer.Display.setTextColor(sel ? C_HIGHLIGHT : C_TEXT_DIM);
+            M5Cardputer.Display.setCursor(barX + barW + 3, y + 2);
+            char dbbuf[6];
+            snprintf(dbbuf, sizeof(dbbuf), "%+ddB", g);
+            M5Cardputer.Display.print(dbbuf);
+        }
+
+        // Footer
+        int footerY = M5Cardputer.Display.height() - BOTTOM_BAR_HEIGHT;
+        M5Cardputer.Display.fillRect(0, footerY, M5Cardputer.Display.width(), BOTTOM_BAR_HEIGHT, C_HEADER);
+        M5Cardputer.Display.setTextColor(C_TEXT_DIM, C_HEADER);
+        M5Cardputer.Display.setCursor(5, footerY + 4);
+        M5Cardputer.Display.print(";/.:band  ,//:dB  R:reset  `:exit");
+    }
 };
 
 int UIManager::settingsCursor = 0; int UIManager::menuScrollOffset = 0; bool UIManager::showVisualizer = true;
@@ -1464,6 +1543,7 @@ int UIManager::helpScrollOffset = 0;
 std::vector<String> UIManager::folderList;
 int UIManager::folderCursor = 0;
 int UIManager::folderScrollOffset = 0;
+int UIManager::eqCursor = 0;
 
 void AudioEngine::MDCallback(void *cbData, const char *type, bool isUnicode, const char *string) {
     if (string[0] == 0) return;
@@ -2404,6 +2484,9 @@ void setup() {
     
     if (nvs_flash_init() != ESP_OK) { nvs_flash_erase(); nvs_flash_init(); }
     ConfigManager::load(); applyCpuFrequency();
+    // Apply saved EQ settings
+    for (int i = 0; i < EQ_BANDS; i++) globalEQ.gain[i] = userSettings.eqGain[i];
+    globalEQ.enabled = userSettings.eqEnabled;
     applyTheme(userSettings.themeIndex);
     auto spk_cfg = M5Cardputer.Speaker.config(); spk_cfg.sample_rate = sampleRateValues[userSettings.spkRateIndex];
     spk_cfg.task_pinned_core = APP_CPU_NUM; spk_cfg.dma_buf_count = 8; spk_cfg.dma_buf_len = 256; spk_cfg.task_priority = 3;    
@@ -2519,6 +2602,7 @@ void loop() {
                  else if (M5Cardputer.Keyboard.isKeyPressed(',')) { audioApp.seek(-userSettings.seek); UIManager::drawNowPlaying(); }
                 else if (M5Cardputer.Keyboard.isKeyPressed(']')) { M5Cardputer.Speaker.setVolume(min(255, M5Cardputer.Speaker.getVolume() + 10)); UIManager::drawNowPlaying(); }
                 else if (M5Cardputer.Keyboard.isKeyPressed('[')) { M5Cardputer.Speaker.setVolume(max(0, M5Cardputer.Speaker.getVolume() - 10)); UIManager::drawNowPlaying(); }
+                else if (M5Cardputer.Keyboard.isKeyPressed('e')) { currentState = UI_EQ; UIManager::eqCursor = 0; UIManager::drawEQ(); }
                 break;
 
             case UI_SETTINGS:
@@ -2744,6 +2828,49 @@ void loop() {
                         delay(1500);
                     }
                     UIManager::drawBaseUI();
+                }
+                break;
+
+            // --------------------------------------------------
+            // EQUALIZER STATE
+            // --------------------------------------------------
+            case UI_EQ:
+                if (M5Cardputer.Keyboard.isKeyPressed('`')) {
+                    // Sync gains to globalEQ then save
+                    for (int i = 0; i < EQ_BANDS; i++) globalEQ.gain[i] = userSettings.eqGain[i];
+                    globalEQ.enabled = userSettings.eqEnabled;
+                    globalEQ.update(44100.0f);
+                    ConfigManager::save();
+                    currentState = UI_PLAYER;
+                    UIManager::drawBaseUI();
+                }
+                else if (M5Cardputer.Keyboard.isKeyPressed(';')) {
+                    UIManager::eqCursor = (UIManager::eqCursor - 1 + EQ_BANDS) % EQ_BANDS;
+                    UIManager::drawEQ();
+                }
+                else if (M5Cardputer.Keyboard.isKeyPressed('.')) {
+                    UIManager::eqCursor = (UIManager::eqCursor + 1) % EQ_BANDS;
+                    UIManager::drawEQ();
+                }
+                else if (M5Cardputer.Keyboard.isKeyPressed('/')) {
+                    int8_t& g = userSettings.eqGain[UIManager::eqCursor];
+                    if (g < 12) { g++; globalEQ.gain[UIManager::eqCursor] = g; globalEQ.update(44100.0f); }
+                    UIManager::drawEQ();
+                }
+                else if (M5Cardputer.Keyboard.isKeyPressed(',')) {
+                    int8_t& g = userSettings.eqGain[UIManager::eqCursor];
+                    if (g > -12) { g--; globalEQ.gain[UIManager::eqCursor] = g; globalEQ.update(44100.0f); }
+                    UIManager::drawEQ();
+                }
+                else if (M5Cardputer.Keyboard.isKeyPressed('r')) {
+                    for (int i = 0; i < EQ_BANDS; i++) { userSettings.eqGain[i] = 0; globalEQ.gain[i] = 0; }
+                    globalEQ.update(44100.0f);
+                    UIManager::drawEQ();
+                }
+                else if (M5Cardputer.Keyboard.isKeyPressed('t')) {
+                    userSettings.eqEnabled = !userSettings.eqEnabled;
+                    globalEQ.enabled = userSettings.eqEnabled;
+                    UIManager::drawEQ();
                 }
                 break;
         }
