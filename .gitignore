@@ -1,1 +1,3 @@
 /arduino-ide-files
+.pio/
+main.cpp

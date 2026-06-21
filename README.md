@@ -1,145 +1,125 @@
-# M5Cardputer MP3 Player 🎵
+# M5Cardputer MP3 Player — EQ Fork
 
-A fully featured, standalone MP3 player designed specifically for the **M5Stack Cardputer**. This application turns your Cardputer into a pocket-sized music station with a graphical interface, audio visualizer, playlist management, and keyboard controls.
+A fully featured, standalone MP3 player for the **M5Stack Cardputer**, forked from [sanchitminda/MP3PlayerForM5Cardputer](https://github.com/sanchitminda/MP3PlayerForM5Cardputer).
 
+This fork adds a **7-band software equalizer** with real-time DSP applied to every audio sample.
 
-## ✨ Features
+---
 
-* **🖥️ Graphical User Interface:**
-    * **Split-Screen Layout:** Scrollable playlist on the left, "Now Playing" details on the right.
-    * **Album Art / Metadata:** Displays Song Title and Artist from ID3 tags.
-    * **Progress Bar:** Real-time seeking bar showing track progress.
-    * **Audio Visualizer:** FFT-based frequency bars that dance to the music (can be toggled to save battery).
+## What's new in this fork
 
-* **🎧 Advanced Playback Controls:**
-    * **Play/Pause/Stop:** Standard media controls.
-    * **Next/Previous:** Skip tracks easily.
-    * **Fast Forward / Rewind:** Jump +/- 5 seconds using `/` and `,`.
-    * **Shuffle Mode:** Randomize your playlist.
-    * **Loop Modes:** Toggle between `1X` (No Loop), `ALL` (Loop All), and `ONE` (Loop Song).
+### 7-Band Equalizer
 
-* **💾 Smart Library Management:**
-    * **Fast Startup:** Scans the SD card once and caches the playlist to a file (`playlist.txt`). Subsequent boots are instant.
-    * **Recursive Scanning:** Finds MP3s in root and subfolders.
-    * **Rescan Option:** Built-in menu to manually refresh the library if you add new songs.
+Press **`E`** from the player screen to open the EQ:
 
-* **ℹ️ On-Device Help:**
-    * Press `I` to open a scrollable Help popup listing all keyboard shortcuts.
- 
-* **Memory-Optimized Playback:** Scans and indexes SD card directories using byte offsets, allowing for massive playlists without running out of RAM.
-  
-* **Web Streamer (NAS Mode):** Connect to an existing Wi-Fi network or spin up a standalone Access Point (Host Mode). Access a clean Web UI from your phone or PC to stream or download MP3s directly from the Cardputer.
-
-* **Smart Power Management:** * **Power Saver Modes:** Dynamically underclocks the CPU when Wi-Fi is off. Choose between Basic (160MHz) or Ultra (80MHz) to massively extend battery life.
-
-* **Display Sleep:** Automatically powers down the LCD controller chip during screen timeouts.
-
-* **Pocket Mode:** Control playback without looking at the screen using the Cardputer's Button A (G0) click combinations.
-## 🛠️ Hardware Requirements
-
-* **M5Stack Cardputer** (ESP32-S3 based)
-* **MicroSD Card** (Formatted to FAT32)
-* MP3 Files
-
-## 📦 Software & Libraries
-
-This project is built using the **Arduino IDE**. You need to install the following libraries via the Arduino Library Manager:
-
-1.  **M5Cardputer** (by M5Stack)
-2.  **M5Unified** (by M5Stack)
-3.  **ESP8266Audio** (by Earle F. Philhower, III) - *Required for MP3 decoding.*
-
-> **Note:** No external JSON library is required. The caching system uses standard file I/O to keep dependencies light.
-
-## 🚀 Installation
-
-1.  **Prepare the SD Card:**
-    * Format your MicroSD card to **FAT32**.
-    * Copy your `.mp3` files onto the card. You can place them in the root directory or organize them into folders.
-    * Insert the SD card into the Cardputer.
-
-2.  **Setup Arduino IDE:**
-    * Open Arduino IDE.
-    * Go to **Tools > Board** and select **M5Stack Cardputer** (or `M5Stack-STAMPS3` if Cardputer isn't listed, but ensure pin definitions match).
-    * Install the required libraries listed above.
-
-3.  **Flash the Code:**
-    * Copy the source code into a new sketch.
-    * Connect your Cardputer via USB-C.
-    * Click **Upload**.
-
-## 🎮 Controls
-
-| Key | Function | Description |
-| :--- | :--- | :--- |
-| **Enter** | Play / Pause Selected
-| **; / .** |  Scroll Playlist Up / Down | Scrolls Up / Down playlist or Menu if Help/Menu is open. |
-| **`[` / `]`** |  Volume - / + | Decrease or Increases Volume. 
-| **N / B** |  Next / Previous Song  | Go back to the previous or next song. |
-| **`/ / ,** |  Seek Forward 5s / Seek Backward 5s | 
-| **S** | Toggle Shuffle | Toggle Shuffle mode On/Off. |
-| **L** | Toggle Loop Mode (All / One / None) | Cycle: 1X (No Loop) -> ALL (Loop All) -> ONE (Loop Song). |
-| **V** | Toggle Visualizer | Toggle the audio visualizer bars On/Off. |
-| **Esc** | Open Settings Menu | Open the System Menu (Rescan SD Card). |
-| **I** | Open Help Menu | Open/Close the Help Shortcut popup. |
-### Pocket Mode (Button A / G0)
-
-* **1 Click**: Play / Pause
-* **2 Clicks**: Next Song
-* **3 Clicks**: Previous Song
-
-*Note: Press any keyboard key to wake the screen if it has timed out.*
-
-## 🌐 Web Server & Wi-Fi Setup
-
-Press `M` to enter the Settings menu to configure Wi-Fi:
-
-1. **Wi-Fi Mode:** Toggle between `STA (Client)` to connect to your home router, or `AP (Host)` to broadcast a network directly from the Cardputer.
-2. **Setup Network:** Follow the on-screen prompts to scan for networks and enter passwords.
-3. **Toggle Wi-Fi Power:** Turn Wi-Fi `ON`. The device will restart and apply the settings.
-4. The IP address will be displayed on the screen header. Navigate to that IP on a device connected to the same network to access the Web UI.
-
-*(Note: Enabling Wi-Fi automatically forces the CPU to 240MHz for network stability, temporarily disabling Power Saver modes).*
-
-## 📂 File Structure
-
-The application automatically creates a cache file on your SD card after the first scan.
-
-```text
-/ (Root)
-├── Music_Folder/
-│   ├── Song1.mp3
-│   └── Song2.mp3
-├── Other_Song.mp3
-└── playlist.txt  <-- Created automatically by the app
 ```
-## ❓ Troubleshooting
+┌──────────────────────────────────────┐
+│             EQUALIZER        [ON]    │
+│  60Hz [====|====]  0dB  <- selected │
+│ 170Hz [====|====]  0dB              │
+│ 310Hz [========|]  +5dB             │
+│ 600Hz [====|====]  0dB              │
+│  3kHz [====|====]  0dB              │
+│  6kHz [==|======] -3dB              │
+│ 12kHz [====|====]  0dB              │
+│  ;/.:band   ,//:dB   R:reset  `:exit│
+└──────────────────────────────────────┘
+```
 
-* **"No MP3 Files Found":**
-    * Ensure the SD card is FAT32.
-    * Ensure files end in `.mp3` (or `.MP3`).
-    * Try pressing `M` then `1` to force a rescan.
-* **Audio Stuttering:**
-    * This can happen with very high bitrate files (320kbps+) or slow SD cards. The code is optimized for 128kbps - 192kbps MP3s.
-* **Compilation Errors:**
-    * Ensure you have installed `ESP8266Audio` version 1.9.7 or later.
-    * Refer to https://github.com/sanchitminda/MP3PlayerForM5Cardputer/issues/5 
+| Band | Type | Frequency |
+|---|---|---|
+| Band 1 | Low Shelf | 60 Hz |
+| Band 2 | Peak | 170 Hz |
+| Band 3 | Peak | 310 Hz |
+| Band 4 | Peak | 600 Hz |
+| Band 5 | Peak | 3 kHz |
+| Band 6 | Peak | 6 kHz |
+| Band 7 | High Shelf | 12 kHz |
 
-## 📜 License
+**EQ Controls:**
 
-This project is open-source. Feel free to modify and improve it!
+| Key | Action |
+|---|---|
+| `E` (player) | Open EQ screen |
+| `;` / `.` | Navigate between bands |
+| `,` / `/` | -1 dB / +1 dB (range: -12 to +12) |
+| `R` | Reset all bands to 0 dB |
+| `T` | Toggle EQ on/off |
+| `` ` `` | Save and return to player |
 
-**Credits:**
-* Audio processing powered by the [ESP8266Audio Library](https://github.com/earlephilhower/ESP8266Audio).
-* UI and Hardware integration via M5Stack libraries.
-## 🐛 Known Issues / Notes
+Settings are persisted to NVS flash and survive reboots.
 
-* **Audio Stuttering:** If you experience audio stuttering while on `ULTRA (80MHz)` Power Saver mode, your MP3 bitrates may be too high for the underclocked CPU. Switch to `BASIC (160MHz)`.
-* **SD Card Limit:** The ESP32 requires file paths to start with a `/`. Ensure your SD card is clean and not corrupted.
+**Implementation:** Biquad IIR filters (direct form II transposed) — 5 multiplications per sample per band per channel. At 7 bands, ~70 operations per stereo sample pair, negligible on ESP32-S3 at 240 MHz.
 
-## 👨‍💻 Author
+---
 
-Created by [Sanchit Minda](https://www.google.com/search?q=https://github.com/sanchitminda)
+## Original Features
 
-If you like this project, feel free to star the repo and share your suggestions!
+- Split-screen playlist + Now Playing panel
+- FFT visualizer (Classic Bars, Waveform, Circular Spikes, OFF)
+- MP3, FLAC, AAC, WAV playback
+- Shuffle, Loop (All / One / None)
+- Fast-forward / rewind seek
+- ID3 tag metadata display
+- Wi-Fi Web UI (STA client or AP host mode) for streaming/downloading
+- Power saver modes (160 MHz / 80 MHz CPU underclock)
+- Display sleep timer
+- Pocket Mode (Button A click combinations)
+- Multi-theme UI (Gunmetal Blue, Cyberpunk, Retro Amber, Hacker Green)
+- Folder-based playlist mode
+- Song search
+- i18n language file support
+- Configurable UI font size
 
+## Hardware Requirements
+
+- **M5Stack Cardputer** (ESP32-S3)
+- MicroSD card (FAT32)
+- Audio files (.mp3, .flac, .aac, .m4a, .wav)
+
+## Building with PlatformIO
+
+The `platformio.ini` and all required configuration are included in the repository.
+
+```bash
+git clone https://github.com/silasgubi/MP3PlayerForM5CardputerBLE.git
+cd MP3PlayerForM5CardputerBLE
+pio run
+# Binary: .pio/build/m5stack-cardputer/firmware.bin
+```
+
+> The ESP8266Audio library is bundled in `lib/ESP8266Audio/`. The custom board definition is in `boards/m5stack-cardputer.json`.
+
+## Libraries
+
+| Library | Source |
+|---|---|
+| M5Cardputer | M5Stack |
+| M5Unified | M5Stack |
+| ESP8266Audio | Bundled in `lib/` (Earle F. Philhower, III) |
+
+## Full Controls
+
+| Key | Function |
+|---|---|
+| `Enter` | Play / Pause selected |
+| `;` / `.` | Scroll playlist up / down |
+| `[` / `]` | Volume - / + |
+| `N` / `B` | Next / Previous song |
+| `/` / `,` | Seek forward / backward |
+| `S` | Toggle Search |
+| `F` | Toggle Shuffle |
+| `L` | Toggle Loop (All / One / None) |
+| `V` | Toggle Visualizer |
+| `E` | Open Equalizer |
+| `` ` `` | Open Settings |
+| `I` | Open Help |
+
+### Pocket Mode (Button A)
+- 1 click: Play/Pause
+- 2 clicks: Next
+- 3 clicks: Previous
+
+## License
+
+Open source. Original work by [Sanchit Minda](https://github.com/sanchitminda). EQ fork by [silasgubi](https://github.com/silasgubi).
